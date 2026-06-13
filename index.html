@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Prasun — Developer & Builder</title>
+  <meta name="description" content="I build small, sharp tools that make everyday life a little better.">
+
+  <!-- SVG favicon: gradient "P" on dark background -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0%25' stop-color='%23b06bff'/><stop offset='100%25' stop-color='%23f472b6'/></linearGradient></defs><rect width='32' height='32' rx='8' fill='%23080611'/><text x='16' y='23' text-anchor='middle' font-family='system-ui,sans-serif' font-weight='900' font-size='21' fill='url(%23g)'>P</text></svg>">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@700;900&family=Manrope:wght@400;600;700;800&family=JetBrains+Mono:wght@600;700;800&display=swap" rel="stylesheet">
+
+  <style>
+    :root{
+      --void:#080611;
+      --ink:rgba(245,240,255,.94);
+      --ink-dim:rgba(245,240,255,.56);
+      --ink-faint:rgba(245,240,255,.34);
+      --pulse:#b06bff;
+      --pulse-soft:rgba(176,107,255,.15);
+      --ice:#f472b6;
+      --gold:#fcd34d;
+      --lilac:#c4b5fd;
+      --glass:rgba(255,255,255,.045);
+      --glass-hi:rgba(255,255,255,.085);
+      --line:rgba(255,255,255,.09);
+      --radius:22px;
+      --mono:'JetBrains Mono',ui-monospace,monospace;
+      --body:'Manrope',system-ui,sans-serif;
+      --disp:'Unbounded',var(--body);
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html{scroll-behavior:smooth}
+    body{
+      background:var(--void);color:var(--ink);
+      font-family:var(--body);font-size:15px;line-height:1.55;
+      min-height:100vh;overflow-x:hidden;
+    }
+
+    /* ── Aura ── */
+    .aura{position:fixed;inset:0;z-index:-1;pointer-events:none}
+    .aura::before,.aura::after{
+      content:"";position:absolute;border-radius:50%;filter:blur(110px);
+    }
+    .aura::before{
+      width:62vw;height:62vw;top:-26vw;right:-16vw;opacity:.28;
+      background:radial-gradient(circle,#7c3aed,transparent 70%);
+    }
+    .aura::after{
+      width:50vw;height:50vw;bottom:-22vw;left:-14vw;opacity:.2;
+      background:radial-gradient(circle,#be3a8e,transparent 70%);
+    }
+
+    /* ── Grain ── */
+    .grain{
+      position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.5;
+      background-image:radial-gradient(rgba(255,255,255,.022) 1px,transparent 1px);
+      background-size:26px 26px;
+    }
+
+    /* ── Cursor trail ── */
+    #cursorFx{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:9998;mix-blend-mode:screen}
+
+    /* ── Nav ── */
+    nav{
+      position:sticky;top:0;z-index:50;
+      backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+      background:rgba(6,8,13,.72);border-bottom:1px solid var(--line);
+    }
+    .nav-in{
+      max-width:1100px;margin:0 auto;padding:15px 24px;
+      display:flex;align-items:center;justify-content:space-between;
+    }
+    .brand{
+      font-family:var(--disp);font-weight:900;font-size:16px;letter-spacing:.5px;
+      background:linear-gradient(100deg,var(--pulse),var(--ice) 60%,var(--gold));
+      -webkit-background-clip:text;background-clip:text;color:transparent;
+      filter:drop-shadow(0 0 14px rgba(176,107,255,.45));
+      text-decoration:none;
+    }
+    .nav-links{display:flex;gap:22px;list-style:none;align-items:center}
+    .nav-links a{
+      font-size:13px;font-weight:700;color:var(--ink-dim);text-decoration:none;
+      transition:color .2s;letter-spacing:.3px;
+    }
+    .nav-links a:hover{color:var(--ink)}
+
+    /* ── Shared layout ── */
+    .wrap{max-width:1100px;margin:0 auto;padding:0 24px}
+
+    /* ── Buttons ── */
+    .btn{
+      font-family:var(--body);font-weight:700;font-size:13px;color:var(--ink);
+      background:var(--glass);border:1px solid var(--line);border-radius:13px;
+      padding:12px 22px;cursor:pointer;text-decoration:none;
+      transition:transform .15s ease,background .2s,border-color .2s,box-shadow .2s;
+      display:inline-flex;align-items:center;gap:8px;white-space:nowrap;
+    }
+    .btn:hover{background:var(--glass-hi);transform:translateY(-1px)}
+    .btn:active{transform:translateY(0)}
+    .btn-glow{
+      background:linear-gradient(120deg,rgba(176,107,255,.95),rgba(244,114,182,.95));
+      color:#04140d;border:none;
+      box-shadow:0 0 22px rgba(176,107,255,.35),0 6px 18px rgba(0,0,0,.4);
+    }
+    .btn-glow:hover{
+      background:linear-gradient(120deg,#c98bff,#f472b6);
+      box-shadow:0 0 32px rgba(176,107,255,.55),0 8px 22px rgba(0,0,0,.45);
+      transform:translateY(-2px);
+    }
+
+    /* ── Hero ── */
+    .hero{padding:100px 0 80px;text-align:center;position:relative}
+    .hero-chip{
+      display:inline-block;font-size:11px;font-weight:800;letter-spacing:3px;
+      text-transform:uppercase;color:var(--lilac);margin-bottom:28px;
+      border:1px solid rgba(196,181,253,.25);border-radius:999px;
+      padding:7px 18px;background:rgba(176,107,255,.08);
+    }
+    .hero-name{
+      font-family:var(--disp);font-weight:900;
+      font-size:clamp(56px,10vw,108px);line-height:1;letter-spacing:-2px;
+      background:linear-gradient(110deg,#fdf0ff 4%,var(--pulse) 36%,var(--ice) 66%,var(--gold));
+      -webkit-background-clip:text;background-clip:text;color:transparent;
+      filter:drop-shadow(0 0 48px rgba(176,107,255,.4));
+      margin-bottom:24px;
+    }
+    .hero-tagline{
+      font-size:clamp(15px,2vw,19px);font-weight:600;color:var(--ink-dim);
+      max-width:500px;margin:0 auto 44px;line-height:1.65;
+    }
+    .hero-tagline b{color:var(--ink)}
+    .hero-cta{display:inline-flex;gap:12px;align-items:center;flex-wrap:wrap;justify-content:center}
+
+    /* ── Section header ── */
+    .section-head{text-align:center;margin-bottom:52px}
+    .section-eyebrow{
+      font-size:11px;font-weight:800;letter-spacing:3px;
+      text-transform:uppercase;color:var(--lilac);margin-bottom:14px;
+    }
+    .section-title{
+      font-family:var(--disp);font-weight:900;font-size:clamp(24px,3.5vw,36px);
+      background:linear-gradient(100deg,var(--pulse),var(--ice) 60%,var(--gold));
+      -webkit-background-clip:text;background-clip:text;color:transparent;
+    }
+
+    /* ── Tools section ── */
+    .tools{padding:80px 0 130px}
+    .tools-grid{
+      display:grid;
+      grid-template-columns:repeat(auto-fill,minmax(340px,1fr));
+      gap:24px;
+    }
+
+    /* ── Tool card ── */
+    .tool-card{
+      background:linear-gradient(165deg,rgba(255,255,255,.065),rgba(255,255,255,.022));
+      border:1px solid var(--line);border-radius:var(--radius);
+      padding:28px 28px 24px;
+      backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+      box-shadow:0 14px 40px rgba(0,0,0,.35);
+      transition:transform .25s cubic-bezier(.22,1,.36,1),border-color .25s,box-shadow .25s;
+      display:flex;flex-direction:column;
+    }
+    .tool-card:hover{
+      transform:translateY(-5px);
+      border-color:rgba(176,107,255,.38);
+      box-shadow:0 24px 64px rgba(0,0,0,.48),0 0 36px rgba(176,107,255,.11);
+    }
+
+    /* PaisaPulse inline SVG logo */
+    .pp-logo{
+      margin-bottom:22px;
+      filter:drop-shadow(0 0 16px rgba(176,107,255,.5));
+    }
+
+    .tool-desc{
+      font-size:13.5px;font-weight:600;color:var(--ink-dim);
+      line-height:1.7;margin-bottom:20px;flex:1;
+    }
+
+    .tool-tags{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:22px}
+    .tool-tag{
+      font-size:11px;font-weight:700;padding:4px 12px;border-radius:999px;
+      border:1px solid var(--line);color:var(--ink-faint);background:var(--glass);
+      font-family:var(--mono);
+    }
+
+    .tool-footer{
+      display:flex;align-items:center;justify-content:space-between;
+      padding-top:20px;border-top:1px solid var(--line);margin-top:auto;
+    }
+    .tool-live{font-size:11.5px;font-weight:700;color:var(--pulse);display:flex;align-items:center;gap:7px}
+    .live-dot{
+      width:7px;height:7px;border-radius:50%;
+      background:var(--pulse);box-shadow:0 0 8px var(--pulse);
+      animation:livePulse 2.5s ease-in-out infinite;
+    }
+    @keyframes livePulse{0%,100%{opacity:1;box-shadow:0 0 8px var(--pulse)}50%{opacity:.3;box-shadow:0 0 4px var(--pulse)}}
+
+    /* ── "Coming soon" placeholder card ── */
+    .tool-card.soon{
+      background:linear-gradient(165deg,rgba(255,255,255,.025),rgba(255,255,255,.008));
+      border-style:dashed;border-color:rgba(255,255,255,.065);
+      display:flex;flex-direction:column;align-items:center;justify-content:center;
+      text-align:center;min-height:260px;gap:14px;
+    }
+    .tool-card.soon:hover{border-color:rgba(176,107,255,.22);transform:translateY(-3px)}
+    .soon-glyph{
+      font-family:var(--mono);font-size:28px;
+      background:linear-gradient(135deg,var(--pulse),var(--ice));
+      -webkit-background-clip:text;background-clip:text;color:transparent;
+      opacity:.5;
+    }
+    .soon-label{font-size:13px;font-weight:700;color:var(--ink-faint);letter-spacing:.3px}
+
+    /* ── Footer ── */
+    footer{
+      text-align:center;padding:44px 24px;
+      border-top:1px solid var(--line);
+      font-size:12px;font-weight:600;color:var(--ink-faint);letter-spacing:.3px;
+      line-height:1.8;
+    }
+    footer a{color:var(--ink-dim);text-decoration:none;transition:color .2s}
+    footer a:hover{color:var(--pulse)}
+    footer strong{color:var(--ink-dim)}
+
+    /* ── Entrance animations ── */
+    @keyframes riseIn{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:none}}
+    .reveal{opacity:0}
+    .reveal.in{animation:riseIn .65s cubic-bezier(.22,1,.36,1) both;animation-delay:var(--d,0s)}
+
+    /* ── Reduced motion ── */
+    @media(prefers-reduced-motion:reduce){
+      .reveal,.reveal.in{opacity:1!important;animation:none!important}
+      .tool-card:hover,.btn:hover,.btn-glow:hover{transform:none}
+      .live-dot{animation:none}
+    }
+
+    @media(max-width:640px){
+      .nav-links{display:none}
+      .hero{padding:64px 0 52px}
+      .hero-name{letter-spacing:-1px}
+      .tools{padding:48px 0 90px}
+      .tools-grid{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+<body>
+  <canvas id="cursorFx"></canvas>
+  <div class="aura"></div>
+  <div class="grain"></div>
+
+  <!-- Nav -->
+  <nav>
+    <div class="nav-in">
+      <a href="#" class="brand">Prasun</a>
+      <ul class="nav-links">
+        <li><a href="#tools">Tools</a></li>
+        <li><a href="https://github.com/theprasunbanerjee" target="_blank" rel="noopener">GitHub ↗</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <main>
+    <!-- Hero -->
+    <section class="hero">
+      <div class="wrap">
+        <div class="hero-chip reveal" style="--d:.05s">Developer &amp; Builder</div>
+        <h1 class="hero-name reveal" style="--d:.15s">Prasun</h1>
+        <p class="hero-tagline reveal" style="--d:.25s">
+          I build <b>small, sharp tools</b> that make everyday life a little better.<br>
+          Offline-first. Privacy-respecting. No nonsense.
+        </p>
+        <div class="hero-cta reveal" style="--d:.35s">
+          <a href="#tools" class="btn btn-glow">See my tools</a>
+          <a href="https://github.com/theprasunbanerjee" target="_blank" rel="noopener" class="btn">GitHub →</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tools -->
+    <section class="tools" id="tools">
+      <div class="wrap">
+        <div class="section-head reveal" style="--d:.05s">
+          <div class="section-eyebrow">Open Source · Free Forever</div>
+          <h2 class="section-title">Things I Built</h2>
+        </div>
+
+        <div class="tools-grid">
+
+          <!-- PaisaPulse card -->
+          <div class="tool-card reveal" style="--d:.15s">
+
+            <!-- Glowing PaisaPulse logo -->
+            <div class="pp-logo">
+              <svg viewBox="0 0 210 52" xmlns="http://www.w3.org/2000/svg" width="210" height="52" aria-label="PaisaPulse">
+                <defs>
+                  <linearGradient id="ppg" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0%"   stop-color="#b06bff"/>
+                    <stop offset="55%"  stop-color="#f472b6"/>
+                    <stop offset="100%" stop-color="#fcd34d"/>
+                  </linearGradient>
+                  <linearGradient id="ppg2" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0%"   stop-color="#b06bff"/>
+                    <stop offset="100%" stop-color="#f472b6"/>
+                  </linearGradient>
+                </defs>
+                <!-- Icon background -->
+                <rect x="0" y="4" width="44" height="44" rx="12"
+                  fill="rgba(176,107,255,.13)" stroke="rgba(176,107,255,.32)" stroke-width="1"/>
+                <!-- Rupee glyph -->
+                <text x="22" y="31" text-anchor="middle"
+                  font-family="system-ui,sans-serif" font-weight="900" font-size="20"
+                  fill="url(#ppg2)">₹</text>
+                <!-- ECG pulse line at bottom of icon -->
+                <polyline
+                  points="4,42 9,42 12,36 15,46 18,39 22,42 40,42"
+                  stroke="url(#ppg2)" stroke-width="1.6" fill="none"
+                  stroke-linecap="round" stroke-linejoin="round" opacity=".75"/>
+                <!-- Wordmark -->
+                <text x="54" y="24"
+                  font-family="'Unbounded',system-ui,sans-serif" font-weight="900" font-size="18"
+                  fill="url(#ppg)">PaisaPulse</text>
+                <!-- Tagline -->
+                <text x="55" y="41"
+                  font-family="'Manrope',system-ui,sans-serif" font-weight="700" font-size="10.5"
+                  fill="rgba(245,240,255,.38)" letter-spacing="2.2">MONEY · MADE VISIBLE</text>
+              </svg>
+            </div>
+
+            <p class="tool-desc">
+              A beautiful, private expense tracker that lives in one HTML file.
+              Your data stays in your browser and your own Google Drive —
+              no servers, no accounts, no tracking.
+            </p>
+
+            <div class="tool-tags">
+              <span class="tool-tag">offline-first</span>
+              <span class="tool-tag">one file</span>
+              <span class="tool-tag">100% free</span>
+              <span class="tool-tag">vanilla JS</span>
+              <span class="tool-tag">no npm</span>
+            </div>
+
+            <div class="tool-footer">
+              <div class="tool-live">
+                <span class="live-dot"></span>
+                Live
+              </div>
+              <a href="https://theprasunbanerjee.github.io/paisapulse/"
+                target="_blank" rel="noopener"
+                class="btn btn-glow"
+                style="font-size:12.5px;padding:10px 20px">
+                Launch →
+              </a>
+            </div>
+          </div>
+
+          <!-- Placeholder -->
+          <div class="tool-card soon reveal" style="--d:.25s">
+            <div class="soon-glyph">✦</div>
+            <div class="soon-label">More tools coming soon</div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <strong>Prasun</strong> · Built with pure HTML / CSS / JS · No frameworks, no nonsense<br>
+    <a href="https://github.com/theprasunbanerjee" target="_blank" rel="noopener">github.com/theprasunbanerjee</a>
+  </footer>
+
+  <script>
+  /* ── Cursor particle trail (same as PaisaPulse) ── */
+  (function initCursorFx(){
+    const cv = document.getElementById("cursorFx");
+    if (!cv) return;
+    const cx = cv.getContext("2d");
+    let W, H, pts = [];
+    const COLORS = [
+      "rgba(176,107,255,A)",
+      "rgba(244,114,182,A)",
+      "rgba(252,211,77,A)"
+    ];
+
+    function resize(){ W = cv.width = innerWidth; H = cv.height = innerHeight; }
+    resize();
+    window.addEventListener("resize", resize);
+
+    let mx = innerWidth / 2, my = innerHeight / 2;
+    window.addEventListener("mousemove", e => { mx = e.clientX; my = e.clientY; });
+
+    (function frame(){
+      requestAnimationFrame(frame);
+      cx.clearRect(0, 0, W, H);
+
+      pts.push({
+        x: mx, y: my,
+        r: Math.random() * 3.5 + 1.5,
+        a: 1,
+        c: COLORS[Math.floor(Math.random() * 3)]
+      });
+      if (pts.length > 80) pts.shift();
+
+      pts.forEach(p => {
+        p.a -= 0.018;
+        p.r *= 0.97;
+        if (p.a <= 0) return;
+        cx.beginPath();
+        cx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        cx.fillStyle = p.c.replace("A", p.a.toFixed(2));
+        cx.fill();
+      });
+
+      pts = pts.filter(p => p.a > 0);
+    })();
+  })();
+
+  /* ── IntersectionObserver entrance reveals ── */
+  (function initReveal(){
+    const els = document.querySelectorAll(".reveal");
+    if (!els.length) return;
+    const ob = new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (e.isIntersecting) { e.target.classList.add("in"); ob.unobserve(e.target); }
+      });
+    }, { threshold: 0.12 });
+    els.forEach(el => ob.observe(el));
+  })();
+  </script>
+</body>
+</html>
