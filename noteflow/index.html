@@ -8,8 +8,6 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700;900&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0%25' stop-color='%23b06bff'/><stop offset='100%25' stop-color='%23f472b6'/></linearGradient></defs><rect width='32' height='32' rx='8' fill='%23080611'/><text x='16' y='23' text-anchor='middle' font-family='system-ui,sans-serif' font-weight='900' font-size='22' fill='url(%23g)'>✎</text></svg>">
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <style>
 :root{
   --void:#080611;
@@ -606,64 +604,6 @@ button,label{touch-action:manipulation}
   #cursorGlow{display:none!important}
 }
 
-/* ---- SYNC TAB ---- */
-.sync-wrap{display:flex;flex-direction:column;gap:16px;flex:1;min-height:0;overflow-y:auto}
-.sync-wrap::-webkit-scrollbar{width:5px}
-.sync-wrap::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:99px}
-
-.sync-status-bar{
-  display:flex;align-items:center;gap:10px;
-  padding:12px 16px;border-radius:12px;
-  background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);
-}
-.sync-dot{
-  width:8px;height:8px;border-radius:50%;flex:none;
-  transition:all .3s ease;background:rgba(255,255,255,.2);
-}
-.sync-dot.connected{background:#4ade80;box-shadow:0 0 10px #4ade80}
-.sync-dot.connecting{background:var(--gold);box-shadow:0 0 10px var(--gold);
-  animation:sync-pulse 1.2s ease-in-out infinite}
-.sync-dot.syncing,.sync-dot.saving{background:var(--pulse);box-shadow:0 0 10px var(--pulse);
-  animation:sync-pulse .8s ease-in-out infinite}
-.sync-dot.error{background:#f87171;box-shadow:0 0 10px #f87171}
-@keyframes sync-pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.8)}}
-.sync-status-text{font-size:13px;font-weight:600;color:var(--ink-dim)}
-.sync-room-badge{
-  font-family:var(--mono);font-size:11px;color:var(--lilac);
-  padding:2px 9px;background:rgba(176,107,255,.15);border:1px solid rgba(176,107,255,.25);
-  border-radius:999px;margin-left:auto;max-width:160px;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-}
-
-.sync-form{display:flex;flex-direction:column;gap:10px}
-.sync-input{
-  width:100%;padding:10px 14px;border-radius:10px;
-  background:rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.1);
-  color:var(--ink);font-family:var(--mono);font-size:13px;
-  transition:border-color .2s,box-shadow .2s;
-}
-.sync-input:focus{outline:none;border-color:rgba(176,107,255,.5);box-shadow:0 0 0 3px rgba(176,107,255,.1)}
-.sync-input::placeholder{color:var(--ink-faint)}
-
-.sync-guide{
-  padding:14px;border-radius:12px;
-  background:rgba(176,107,255,.05);border:1px solid rgba(176,107,255,.13);
-}
-.sync-guide ol{margin:8px 0 0 18px;display:flex;flex-direction:column;gap:5px}
-.sync-guide li{font-size:12.5px;color:var(--ink-dim);line-height:1.55}
-.sync-guide code{
-  font-family:var(--mono);font-size:11.5px;
-  background:rgba(176,107,255,.18);padding:1px 6px;border-radius:4px;color:var(--lilac);
-}
-.sync-conn-card{
-  display:flex;flex-direction:column;gap:10px;
-  padding:14px;border-radius:12px;
-  background:rgba(74,222,128,.05);border:1px solid rgba(74,222,128,.2);
-}
-.sync-conn-label{font-size:10px;font-weight:800;letter-spacing:1.8px;text-transform:uppercase;color:rgba(74,222,128,.6);margin-bottom:3px}
-.sync-conn-val{font-family:var(--mono);font-size:13px;color:#4ade80;word-break:break-all}
-.sync-conn-val.small{font-size:11px;color:rgba(74,222,128,.55)}
-.sync-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
 </style>
 </head>
 <body>
@@ -760,7 +700,6 @@ button,label{touch-action:manipulation}
       <div class="stabs" id="stabs">
         <button class="stab active" onclick="switchSecretTab('formatter')">🔧 Formatter</button>
         <button class="stab" onclick="switchSecretTab('sessions')">📂 Sessions</button>
-        <button class="stab" onclick="switchSecretTab('sync')">🔗 Sync</button>
       </div>
       <button class="s-close" onclick="closeSecret()" title="Close (Esc)">✕</button>
     </div>
@@ -809,72 +748,6 @@ Auto-detects:
       <div class="sessions-wrap">
         <div class="s-label" style="margin-bottom:12px">5 SESSIONS — click to switch · double-click name to rename</div>
         <div class="sessions-grid" id="sessionsGrid"></div>
-      </div>
-    </div>
-
-    <!-- ---- SYNC TAB ---- -->
-    <div class="s-content" id="stab-sync" hidden>
-      <div class="sync-wrap">
-
-        <!-- Status bar -->
-        <div class="sync-status-bar">
-          <div class="sync-dot" id="syncDot"></div>
-          <span class="sync-status-text" id="syncStatusText">Not connected</span>
-          <span class="sync-room-badge" id="syncRoomBadge" hidden></span>
-        </div>
-
-        <!-- Connected view -->
-        <div id="syncConnectedView" hidden>
-          <div class="sync-conn-card">
-            <div>
-              <div class="sync-conn-label">Room Code</div>
-              <div class="sync-conn-val" id="syncRoomDisplay"></div>
-            </div>
-            <div>
-              <div class="sync-conn-label">Database</div>
-              <div class="sync-conn-val small" id="syncUrlDisplay"></div>
-            </div>
-          </div>
-          <div class="sync-actions">
-            <button class="action-btn highlight" onclick="pushToFirebase()">↑ Force Push Now</button>
-            <button class="action-btn" onclick="disconnectSync()">✕ Disconnect</button>
-          </div>
-        </div>
-
-        <!-- Setup view -->
-        <div id="syncSetupView">
-          <div class="sync-form">
-            <div>
-              <div class="s-label" style="margin-bottom:6px">FIREBASE DATABASE URL</div>
-              <input type="url" id="syncFbUrl" class="sync-input"
-                placeholder="https://your-project-default-rtdb.firebaseio.com"
-                autocomplete="off" spellcheck="false" />
-            </div>
-            <div>
-              <div class="s-label" style="margin-bottom:6px">ROOM CODE
-                <span style="color:var(--ink-faint);text-transform:none;font-size:11px;font-weight:500;letter-spacing:0">(same on all your devices)</span>
-              </div>
-              <input type="text" id="syncRoomCode" class="sync-input"
-                placeholder="e.g. prasun-secret-notes"
-                autocomplete="off" spellcheck="false" />
-            </div>
-            <button class="btn-glow" style="padding:12px;font-size:14px;border-radius:13px;margin-top:2px"
-              onclick="connectSync()">⚡ Connect &amp; Sync</button>
-          </div>
-        </div>
-
-        <!-- How-to guide -->
-        <div class="sync-guide">
-          <div class="s-label" style="margin-bottom:6px">HOW TO SET UP — FREE, 5 MIN</div>
-          <ol>
-            <li>Go to <code>console.firebase.google.com</code> → Create a project</li>
-            <li>Build → Realtime Database → Create Database (choose any region)</li>
-            <li>In <strong>Rules</strong> tab paste: <code>{ "rules": { ".read": true, ".write": true } }</code> → Publish</li>
-            <li>Copy the <strong>Database URL</strong> shown at the top (ends in <code>firebaseio.com</code>)</li>
-            <li>Paste it above, type any Room Code, click Connect — enter the same Room Code on all your devices</li>
-          </ol>
-        </div>
-
       </div>
     </div>
 
@@ -1089,167 +962,33 @@ function escHtml(str) {
 }
 
 /* ================================================================
-   BROADCAST CHANNEL — real-time sync across tabs (same device, zero cloud)
+   BROADCAST CHANNEL — live sync across tabs on same device/browser
    ================================================================ */
 const bc = (typeof BroadcastChannel !== 'undefined') ? new BroadcastChannel('noteflow_v1') : null;
 
 if (bc) {
   bc.onmessage = (e) => {
-    if (e.data.type !== 'sync') return;
-    // Reload sessions from storage (the other tab already persisted them)
-    const raw = localStorage.getItem(SESSIONS_KEY);
-    if (!raw) return;
-    try { sessions = JSON.parse(raw); } catch { return; }
-
-    // If the other tab is editing OUR active session and we haven't typed recently, update editor
-    if (e.data.activeId === activeId && Date.now() - lastKeyAt > 800) {
-      editor.value = sessions[activeId]?.content || '';
+    const d = e.data;
+    // Live keystroke update: same session open in this tab → mirror it instantly
+    if (d.type === 'live' && d.activeId === activeId && Date.now() - lastKeyAt > 500) {
+      editor.value = d.content;
       updateStats();
+      return;
     }
-    updatePill();
-    const sg = document.getElementById('sessionsGrid');
-    if (sg && !document.getElementById('stab-sessions').hidden) renderSessionsGrid();
-  };
-}
-
-
-/* ================================================================
-   FIREBASE REALTIME SYNC — cross-device
-   ================================================================ */
-const FB_URL_KEY  = 'noteflow.fb.url.v1';
-const FB_ROOM_KEY = 'noteflow.fb.room.v1';
-
-let fbApp          = null;
-let fbDb           = null;
-let fbRef          = null;
-let isRemoteUpdate = false;
-
-function setSyncStatus(state) {
-  const dot   = document.getElementById('syncDot');
-  const text  = document.getElementById('syncStatusText');
-  const badge = document.getElementById('syncRoomBadge');
-  if (!dot || !text) return;
-  dot.className = 'sync-dot ' + state;
-  const labels = {
-    '': 'Not connected', connecting: 'Connecting…',
-    connected: 'Synced ✓', syncing: 'Syncing…',
-    saving: 'Saving…', error: 'Connection error'
-  };
-  text.textContent = labels[state] !== undefined ? labels[state] : state;
-  if (badge) {
-    const room = localStorage.getItem(FB_ROOM_KEY);
-    if ((state === 'connected' || state === 'saving') && room) {
-      badge.textContent = room;
-      badge.hidden = false;
-    } else {
-      badge.hidden = true;
-    }
-  }
-}
-
-function updateSyncUI(connected) {
-  const setup = document.getElementById('syncSetupView');
-  const conn  = document.getElementById('syncConnectedView');
-  if (!setup || !conn) return;
-  if (connected) {
-    setup.hidden = true;
-    conn.hidden  = false;
-    document.getElementById('syncRoomDisplay').textContent = localStorage.getItem(FB_ROOM_KEY) || '';
-    document.getElementById('syncUrlDisplay').textContent  = localStorage.getItem(FB_URL_KEY)  || '';
-  } else {
-    setup.hidden = false;
-    conn.hidden  = true;
-    const savedUrl  = localStorage.getItem(FB_URL_KEY);
-    const savedRoom = localStorage.getItem(FB_ROOM_KEY);
-    if (savedUrl)  document.getElementById('syncFbUrl').value    = savedUrl;
-    if (savedRoom) document.getElementById('syncRoomCode').value = savedRoom;
-  }
-}
-
-function connectSync() {
-  const url  = (document.getElementById('syncFbUrl').value  || '').trim();
-  const room = (document.getElementById('syncRoomCode').value || '').trim().replace(/[^a-zA-Z0-9_-]/g, '-');
-  if (!url || !room) { alert('Please enter both the Database URL and a Room Code.'); return; }
-  if (!url.startsWith('https://') || !url.includes('firebaseio.com')) {
-    alert('That doesn\'t look like a Firebase Realtime Database URL.\nExpected: https://your-project-default-rtdb.firebaseio.com');
-    return;
-  }
-  localStorage.setItem(FB_URL_KEY, url);
-  localStorage.setItem(FB_ROOM_KEY, room);
-  connectToFirebase(url, room);
-}
-
-function connectToFirebase(url, room) {
-  if (fbRef) { try { fbRef.off(); } catch(e) {} fbRef = null; }
-  if (fbApp) { try { fbApp.delete(); } catch(e) {} fbApp = null; fbDb = null; }
-
-  setSyncStatus('connecting');
-  try {
-    fbApp = firebase.initializeApp({ databaseURL: url }, 'noteflow-' + Date.now());
-    fbDb  = firebase.database(fbApp);
-    fbRef = fbDb.ref('/' + room + '/sessions');
-
-    fbRef.on('value', snapshot => {
-      const remote = snapshot.val();
-      if (remote === null) {
-        pushToFirebase();
-      } else {
-        isRemoteUpdate = true;
-        let changed = false;
-        (Array.isArray(remote) ? remote : Object.values(remote)).forEach((rs, i) => {
-          if (!rs || !sessions[i]) return;
-          const localTs  = sessions[i].updatedAt ? new Date(sessions[i].updatedAt).getTime() : 0;
-          const remoteTs = rs.updatedAt           ? new Date(rs.updatedAt).getTime()          : 0;
-          if (remoteTs > localTs) { sessions[i] = { ...rs, id: i }; changed = true; }
-        });
-        if (changed) {
-          persistSessions();
-          updatePill();
-          const newContent = sessions[activeId]?.content || '';
-          if (newContent !== editor.value && Date.now() - lastKeyAt > 1000) {
-            editor.value = newContent;
-            updateStats();
-          }
-          const sg = document.getElementById('sessionsGrid');
-          if (sg && !document.getElementById('stab-sessions').hidden) renderSessionsGrid();
-        }
-        isRemoteUpdate = false;
+    // Session switch or name change: reload from storage
+    if (d.type === 'sync') {
+      const raw = localStorage.getItem(SESSIONS_KEY);
+      if (!raw) return;
+      try { sessions = JSON.parse(raw); } catch { return; }
+      if (d.activeId === activeId && Date.now() - lastKeyAt > 500) {
+        editor.value = sessions[activeId]?.content || '';
+        updateStats();
       }
-      setSyncStatus('connected');
-      updateSyncUI(true);
-    }, err => {
-      console.error('[NoteFlow sync]', err);
-      setSyncStatus('error');
-    });
-  } catch(err) {
-    console.error('[NoteFlow sync] init:', err);
-    setSyncStatus('error');
-    alert('Could not connect to Firebase.\n\nError: ' + err.message);
-  }
-}
-
-function pushToFirebase() {
-  if (!fbRef || isRemoteUpdate) return;
-  flushCurrentSession();
-  setSyncStatus('saving');
-  fbRef.set(sessions)
-    .then(() => setSyncStatus('connected'))
-    .catch(err => { console.error('[NoteFlow sync] push:', err); setSyncStatus('error'); });
-}
-
-function disconnectSync() {
-  if (fbRef) { try { fbRef.off(); } catch(e) {} fbRef = null; }
-  if (fbApp) { try { fbApp.delete(); } catch(e) {} fbApp = null; fbDb = null; }
-  localStorage.removeItem(FB_URL_KEY);
-  localStorage.removeItem(FB_ROOM_KEY);
-  setSyncStatus('');
-  updateSyncUI(false);
-}
-
-function initFirebase() {
-  const url  = localStorage.getItem(FB_URL_KEY);
-  const room = localStorage.getItem(FB_ROOM_KEY);
-  if (url && room) connectToFirebase(url, room);
+      updatePill();
+      const sg = document.getElementById('sessionsGrid');
+      if (sg && !document.getElementById('stab-sessions').hidden) renderSessionsGrid();
+    }
+  };
 }
 
 
@@ -1280,7 +1019,6 @@ function saveNow() {
   flushCurrentSession();
   persistSessions();
   if (bc) bc.postMessage({type:'sync', activeId});
-  if (fbRef && !isRemoteUpdate) pushToFirebase();
   saveStatus.classList.add('saved');
   saveText.textContent = 'saved';
   setTimeout(() => {
@@ -1324,7 +1062,6 @@ function switchSecretTab(tab) {
   if (pane) pane.hidden = false;
 
   if (tab === 'sessions') renderSessionsGrid();
-  if (tab === 'sync') updateSyncUI(!!fbRef);
 }
 
 /* Global keyboard handler */
@@ -1640,12 +1377,13 @@ if (window.matchMedia('(prefers-reduced-motion:reduce)').matches) {
    ================================================================ */
 document.addEventListener('DOMContentLoaded', () => {
   initSessions();
-  initFirebase();
 
   editor.addEventListener('input', () => {
     lastKeyAt = Date.now();
     updateStats();
     autoSave();
+    // Broadcast live to any other tab showing the same session
+    if (bc) bc.postMessage({ type: 'live', activeId, content: editor.value });
     // Live-update the active card preview while sessions panel is open
     const previewEl = document.querySelector('#sessionsGrid .sc.active .sc-preview');
     if (previewEl) {
