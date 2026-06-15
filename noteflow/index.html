@@ -665,10 +665,7 @@ button,label{touch-action:manipulation}
         <span class="save-dot"></span>
         <span id="saveText">auto-saving</span>
       </div>
-      <button class="sync-btn" id="syncBtn" onclick="copySyncLink()" title="Copy this URL and open on any device to sync">
-        <span class="sync-live-dot" id="syncLiveDot"></span>
-        <span id="syncBtnText">Copy Link</span>
-      </button>
+      <span class="sync-live-dot" id="syncLiveDot" title="Live sync"></span>
     </div>
   </div>
 </header>
@@ -1017,61 +1014,35 @@ if (bc) {
 
 
 /* ================================================================
-   GUN.JS — real-time global sync across any device / browser
+   GUN.JS — real-time global sync, zero setup
+   Same content on every device/browser that opens this page.
    ================================================================ */
-const ROOM_KEY = 'noteflow.room.v1';
+const GUN_ROOM = 'nf-v3-tpb-jx8k2p7r';  // fixed room, shared by all instances
 
-let gunNode    = null;
-let gunPushTs  = 0;
-
-function getOrCreateRoom() {
-  const params  = new URLSearchParams(window.location.search);
-  const urlRoom = params.get('r');
-  if (urlRoom) {
-    localStorage.setItem(ROOM_KEY, urlRoom);
-    return urlRoom;
-  }
-  let room = localStorage.getItem(ROOM_KEY);
-  if (!room) {
-    const rnd = () => Math.random().toString(36).slice(2, 9);
-    room = 'nf-' + rnd() + rnd();
-    localStorage.setItem(ROOM_KEY, room);
-  }
-  // Stamp the room code into the URL so bookmarking preserves it
-  const url = new URL(window.location.href);
-  url.searchParams.set('r', room);
-  history.replaceState(null, '', url.toString());
-  return room;
-}
+let gunNode   = null;
+let gunPushTs = 0;
 
 function setLiveDot(state) {
   const d = document.getElementById('syncLiveDot');
-  if (!d) return;
-  d.className = 'sync-live-dot' + (state ? ' ' + state : '');
+  if (d) d.className = 'sync-live-dot' + (state ? ' ' + state : '');
 }
 
 function initGun() {
-  const room = getOrCreateRoom();
-
   const gun = Gun([
     'https://gun-manhattan.herokuapp.com/gun',
     'https://peer.wallie.io/gun',
     'https://gunjs.herokuapp.com/gun'
   ]);
 
-  gunNode = gun.get('noteflow-v3/' + room);
+  gunNode = gun.get(GUN_ROOM);
 
   gunNode.on((val) => {
     if (!val || !val.s) return;
-    // Skip updates we just pushed (within 1 s)
     if (val.ts && Math.abs(val.ts - gunPushTs) < 1000) return;
-    // Don't stomp over what the user is actively typing
     if (Date.now() - lastKeyAt < 1200) return;
-
     try {
       const remote = JSON.parse(val.s);
       if (!Array.isArray(remote)) return;
-
       let changed = false;
       remote.forEach((rs, i) => {
         if (!rs || !sessions[i]) return;
@@ -1079,7 +1050,6 @@ function initGun() {
         const rt = rs.updatedAt          ? new Date(rs.updatedAt).getTime()          : 0;
         if (rt > lt) { sessions[i] = { ...rs, id: i }; changed = true; }
       });
-
       if (changed) {
         persistSessions();
         updatePill();
@@ -1097,24 +1067,7 @@ function pushToGun() {
   if (!gunNode) return;
   setLiveDot('busy');
   gunPushTs = Date.now();
-  gunNode.put({ s: JSON.stringify(sessions), ts: gunPushTs },
-    () => setLiveDot('on'));
-}
-
-function copySyncLink() {
-  const url = window.location.href;
-  navigator.clipboard.writeText(url).then(() => {
-    const btn  = document.getElementById('syncBtn');
-    const text = document.getElementById('syncBtnText');
-    btn.classList.add('copied');
-    text.textContent = 'Copied!';
-    setTimeout(() => {
-      btn.classList.remove('copied');
-      text.textContent = 'Copy Link';
-    }, 2200);
-  }).catch(() => {
-    prompt('Copy this URL and open it on your other devices:', url);
-  });
+  gunNode.put({ s: JSON.stringify(sessions), ts: gunPushTs }, () => setLiveDot('on'));
 }
 
 
