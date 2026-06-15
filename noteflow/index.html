@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700;900&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0%25' stop-color='%23b06bff'/><stop offset='100%25' stop-color='%23f472b6'/></linearGradient></defs><rect width='32' height='32' rx='8' fill='%23080611'/><text x='16' y='23' text-anchor='middle' font-family='system-ui,sans-serif' font-weight='900' font-size='22' fill='url(%23g)'>✎</text></svg>">
+<script src="https://cdn.jsdelivr.net/npm/gun@0.2020.1240/gun.js"></script>
 <style>
 :root{
   --void:#080611;
@@ -604,6 +605,25 @@ button,label{touch-action:manipulation}
   #cursorGlow{display:none!important}
 }
 
+/* ---- SYNC BUTTON ---- */
+.sync-btn{
+  display:inline-flex;align-items:center;gap:6px;
+  font-size:11.5px;font-weight:700;padding:5px 11px;border-radius:8px;
+  background:var(--glass);border:1px solid var(--line);
+  color:var(--ink-faint);cursor:pointer;transition:all .15s ease;white-space:nowrap;
+}
+.sync-btn:hover{background:var(--glass-hi);color:var(--ink);border-color:rgba(176,107,255,.3)}
+.sync-btn.copied{background:rgba(74,222,128,.1);border-color:rgba(74,222,128,.35);color:#4ade80}
+.sync-live-dot{
+  width:6px;height:6px;border-radius:50%;flex:none;
+  background:rgba(255,255,255,.18);transition:all .4s ease;
+}
+.sync-live-dot.on{background:#4ade80;box-shadow:0 0 7px #4ade80}
+.sync-live-dot.busy{background:var(--gold);box-shadow:0 0 7px var(--gold);
+  animation:sld-pulse .9s ease-in-out infinite}
+@keyframes sld-pulse{0%,100%{opacity:1}50%{opacity:.35}}
+@media(max-width:600px){.sync-btn{font-size:11px;padding:4px 8px}}
+
 </style>
 </head>
 <body>
@@ -645,6 +665,10 @@ button,label{touch-action:manipulation}
         <span class="save-dot"></span>
         <span id="saveText">auto-saving</span>
       </div>
+      <button class="sync-btn" id="syncBtn" onclick="copySyncLink()" title="Copy this URL and open on any device to sync">
+        <span class="sync-live-dot" id="syncLiveDot"></span>
+        <span id="syncBtnText">Copy Link</span>
+      </button>
     </div>
   </div>
 </header>
@@ -993,6 +1017,108 @@ if (bc) {
 
 
 /* ================================================================
+   GUN.JS — real-time global sync across any device / browser
+   ================================================================ */
+const ROOM_KEY = 'noteflow.room.v1';
+
+let gunNode    = null;
+let gunPushTs  = 0;
+
+function getOrCreateRoom() {
+  const params  = new URLSearchParams(window.location.search);
+  const urlRoom = params.get('r');
+  if (urlRoom) {
+    localStorage.setItem(ROOM_KEY, urlRoom);
+    return urlRoom;
+  }
+  let room = localStorage.getItem(ROOM_KEY);
+  if (!room) {
+    const rnd = () => Math.random().toString(36).slice(2, 9);
+    room = 'nf-' + rnd() + rnd();
+    localStorage.setItem(ROOM_KEY, room);
+  }
+  // Stamp the room code into the URL so bookmarking preserves it
+  const url = new URL(window.location.href);
+  url.searchParams.set('r', room);
+  history.replaceState(null, '', url.toString());
+  return room;
+}
+
+function setLiveDot(state) {
+  const d = document.getElementById('syncLiveDot');
+  if (!d) return;
+  d.className = 'sync-live-dot' + (state ? ' ' + state : '');
+}
+
+function initGun() {
+  const room = getOrCreateRoom();
+
+  const gun = Gun([
+    'https://gun-manhattan.herokuapp.com/gun',
+    'https://peer.wallie.io/gun',
+    'https://gunjs.herokuapp.com/gun'
+  ]);
+
+  gunNode = gun.get('noteflow-v3/' + room);
+
+  gunNode.on((val) => {
+    if (!val || !val.s) return;
+    // Skip updates we just pushed (within 1 s)
+    if (val.ts && Math.abs(val.ts - gunPushTs) < 1000) return;
+    // Don't stomp over what the user is actively typing
+    if (Date.now() - lastKeyAt < 1200) return;
+
+    try {
+      const remote = JSON.parse(val.s);
+      if (!Array.isArray(remote)) return;
+
+      let changed = false;
+      remote.forEach((rs, i) => {
+        if (!rs || !sessions[i]) return;
+        const lt = sessions[i].updatedAt ? new Date(sessions[i].updatedAt).getTime() : 0;
+        const rt = rs.updatedAt          ? new Date(rs.updatedAt).getTime()          : 0;
+        if (rt > lt) { sessions[i] = { ...rs, id: i }; changed = true; }
+      });
+
+      if (changed) {
+        persistSessions();
+        updatePill();
+        const nc = sessions[activeId]?.content || '';
+        if (nc !== editor.value) { editor.value = nc; updateStats(); }
+        const sg = document.getElementById('sessionsGrid');
+        if (sg && !document.getElementById('stab-sessions').hidden) renderSessionsGrid();
+      }
+      setLiveDot('on');
+    } catch(e) {}
+  });
+}
+
+function pushToGun() {
+  if (!gunNode) return;
+  setLiveDot('busy');
+  gunPushTs = Date.now();
+  gunNode.put({ s: JSON.stringify(sessions), ts: gunPushTs },
+    () => setLiveDot('on'));
+}
+
+function copySyncLink() {
+  const url = window.location.href;
+  navigator.clipboard.writeText(url).then(() => {
+    const btn  = document.getElementById('syncBtn');
+    const text = document.getElementById('syncBtnText');
+    btn.classList.add('copied');
+    text.textContent = 'Copied!';
+    setTimeout(() => {
+      btn.classList.remove('copied');
+      text.textContent = 'Copy Link';
+    }, 2200);
+  }).catch(() => {
+    prompt('Copy this URL and open it on your other devices:', url);
+  });
+}
+
+
+/* ================================================================
    EDITOR — stats & auto-save
    ================================================================ */
 function updateStats() {
@@ -1019,6 +1145,7 @@ function saveNow() {
   flushCurrentSession();
   persistSessions();
   if (bc) bc.postMessage({type:'sync', activeId});
+  pushToGun();
   saveStatus.classList.add('saved');
   saveText.textContent = 'saved';
   setTimeout(() => {
@@ -1377,6 +1504,7 @@ if (window.matchMedia('(prefers-reduced-motion:reduce)').matches) {
    ================================================================ */
 document.addEventListener('DOMContentLoaded', () => {
   initSessions();
+  initGun();
 
   editor.addEventListener('input', () => {
     lastKeyAt = Date.now();
