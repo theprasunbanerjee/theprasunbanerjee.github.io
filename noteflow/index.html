@@ -8,7 +8,6 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700;900&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0%25' stop-color='%23b06bff'/><stop offset='100%25' stop-color='%23f472b6'/></linearGradient></defs><rect width='32' height='32' rx='8' fill='%23080611'/><text x='16' y='23' text-anchor='middle' font-family='system-ui,sans-serif' font-weight='900' font-size='22' fill='url(%23g)'>✎</text></svg>">
-<script src="https://cdn.jsdelivr.net/npm/gun@0.2020.1240/gun.js"></script>
 <style>
 :root{
   --void:#080611;
@@ -605,24 +604,6 @@ button,label{touch-action:manipulation}
   #cursorGlow{display:none!important}
 }
 
-/* ---- SYNC BUTTON ---- */
-.sync-btn{
-  display:inline-flex;align-items:center;gap:6px;
-  font-size:11.5px;font-weight:700;padding:5px 11px;border-radius:8px;
-  background:var(--glass);border:1px solid var(--line);
-  color:var(--ink-faint);cursor:pointer;transition:all .15s ease;white-space:nowrap;
-}
-.sync-btn:hover{background:var(--glass-hi);color:var(--ink);border-color:rgba(176,107,255,.3)}
-.sync-btn.copied{background:rgba(74,222,128,.1);border-color:rgba(74,222,128,.35);color:#4ade80}
-.sync-live-dot{
-  width:6px;height:6px;border-radius:50%;flex:none;
-  background:rgba(255,255,255,.18);transition:all .4s ease;
-}
-.sync-live-dot.on{background:#4ade80;box-shadow:0 0 7px #4ade80}
-.sync-live-dot.busy{background:var(--gold);box-shadow:0 0 7px var(--gold);
-  animation:sld-pulse .9s ease-in-out infinite}
-@keyframes sld-pulse{0%,100%{opacity:1}50%{opacity:.35}}
-@media(max-width:600px){.sync-btn{font-size:11px;padding:4px 8px}}
 
 </style>
 </head>
@@ -665,7 +646,6 @@ button,label{touch-action:manipulation}
         <span class="save-dot"></span>
         <span id="saveText">auto-saving</span>
       </div>
-      <span class="sync-live-dot" id="syncLiveDot" title="Live sync"></span>
     </div>
   </div>
 </header>
@@ -1014,60 +994,65 @@ if (bc) {
 
 
 /* ================================================================
-   GUN.JS — real-time global sync, zero setup
-   Same content on every device/browser that opens this page.
+   SHARED STORAGE — jsonblob.com
+   One blob, shared by everyone who opens this page. Zero setup.
    ================================================================ */
-const GUN_ROOM = 'nf-v3-tpb-jx8k2p7r';  // fixed room, shared by all instances
+const BLOB = 'https://jsonblob.com/api/jsonBlob/019ecc54-b598-7ce1-8198-b2f0bf9003d1';
 
-let gunNode   = null;
-let gunPushTs = 0;
+let lastPushedTs = '';
+let pushDebounce = null;
 
-function setLiveDot(state) {
-  const d = document.getElementById('syncLiveDot');
-  if (d) d.className = 'sync-live-dot' + (state ? ' ' + state : '');
+async function pushBlob() {
+  flushCurrentSession();
+  const ts = new Date().toISOString();
+  sessions.forEach(s => { if (!s.updatedAt) s.updatedAt = ts; });
+  try {
+    const res = await fetch(BLOB, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({ sessions, updatedAt: ts })
+    });
+    if (res.ok) lastPushedTs = ts;
+  } catch(e) {}
 }
 
-function initGun() {
-  const gun = Gun([
-    'https://gun-manhattan.herokuapp.com/gun',
-    'https://peer.wallie.io/gun',
-    'https://gunjs.herokuapp.com/gun'
-  ]);
+async function pollBlob() {
+  try {
+    const res = await fetch(BLOB, { headers: { 'Accept': 'application/json' } });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (!data?.sessions || !Array.isArray(data.sessions)) return;
+    if (data.updatedAt && data.updatedAt === lastPushedTs) return;
 
-  gunNode = gun.get(GUN_ROOM);
-
-  gunNode.on((val) => {
-    if (!val || !val.s) return;
-    if (val.ts && Math.abs(val.ts - gunPushTs) < 1000) return;
     if (Date.now() - lastKeyAt < 1200) return;
-    try {
-      const remote = JSON.parse(val.s);
-      if (!Array.isArray(remote)) return;
-      let changed = false;
-      remote.forEach((rs, i) => {
-        if (!rs || !sessions[i]) return;
-        const lt = sessions[i].updatedAt ? new Date(sessions[i].updatedAt).getTime() : 0;
-        const rt = rs.updatedAt          ? new Date(rs.updatedAt).getTime()          : 0;
-        if (rt > lt) { sessions[i] = { ...rs, id: i }; changed = true; }
-      });
-      if (changed) {
-        persistSessions();
-        updatePill();
-        const nc = sessions[activeId]?.content || '';
-        if (nc !== editor.value) { editor.value = nc; updateStats(); }
-        const sg = document.getElementById('sessionsGrid');
-        if (sg && !document.getElementById('stab-sessions').hidden) renderSessionsGrid();
-      }
-      setLiveDot('on');
-    } catch(e) {}
-  });
+
+    let changed = false;
+    data.sessions.forEach((rs, i) => {
+      if (!rs || !sessions[i]) return;
+      const lt = sessions[i].updatedAt ? new Date(sessions[i].updatedAt).getTime() : 0;
+      const rt = rs.updatedAt          ? new Date(rs.updatedAt).getTime()          : 0;
+      if (rt > lt) { sessions[i] = { ...rs, id: i }; changed = true; }
+    });
+
+    if (changed) {
+      persistSessions();
+      updatePill();
+      const nc = sessions[activeId]?.content || '';
+      if (nc !== editor.value) { editor.value = nc; updateStats(); }
+      const sg = document.getElementById('sessionsGrid');
+      if (sg && !document.getElementById('stab-sessions').hidden) renderSessionsGrid();
+    }
+  } catch(e) {}
 }
 
-function pushToGun() {
-  if (!gunNode) return;
-  setLiveDot('busy');
-  gunPushTs = Date.now();
-  gunNode.put({ s: JSON.stringify(sessions), ts: gunPushTs }, () => setLiveDot('on'));
+function schedulePush() {
+  clearTimeout(pushDebounce);
+  pushDebounce = setTimeout(pushBlob, 2000);
+}
+
+function initSync() {
+  pollBlob();                       // load remote state immediately on open
+  setInterval(pollBlob, 5000);      // keep polling every 5 s for changes
 }
 
 
@@ -1098,7 +1083,7 @@ function saveNow() {
   flushCurrentSession();
   persistSessions();
   if (bc) bc.postMessage({type:'sync', activeId});
-  pushToGun();
+  schedulePush();
   saveStatus.classList.add('saved');
   saveText.textContent = 'saved';
   setTimeout(() => {
@@ -1457,7 +1442,7 @@ if (window.matchMedia('(prefers-reduced-motion:reduce)').matches) {
    ================================================================ */
 document.addEventListener('DOMContentLoaded', () => {
   initSessions();
-  initGun();
+  initSync();
 
   editor.addEventListener('input', () => {
     lastKeyAt = Date.now();
