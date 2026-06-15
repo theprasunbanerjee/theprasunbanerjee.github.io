@@ -651,6 +651,29 @@ button,label{touch-action:manipulation}
 </header>
 
 <!-- ============================================================
+     SYNC BANNER (hidden once token is set)
+     ============================================================ -->
+<div id="syncBanner" hidden style="
+  background:linear-gradient(90deg,rgba(176,107,255,.12),rgba(244,114,182,.08));
+  border-bottom:1px solid rgba(176,107,255,.25);
+  padding:10px 20px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  font-size:12.5px;color:var(--ink-dim);font-weight:600;">
+  <span>⚡ Paste a <a href="https://github.com/settings/tokens/new?scopes=public_repo&description=NoteFlow+Sync" target="_blank" style="color:var(--pulse);text-decoration:none">GitHub token</a> to sync across devices:</span>
+  <input id="tokenInput" type="password" placeholder="ghp_xxxxxxxxxxxx"
+    style="flex:1;min-width:200px;padding:6px 12px;border-radius:8px;font-family:monospace;font-size:12px;
+    background:rgba(0,0,0,.45);border:1px solid rgba(176,107,255,.3);color:var(--ink);outline:none;"
+    onkeydown="if(event.key==='Enter')saveToken()" />
+  <button onclick="saveToken()" style="padding:6px 14px;border-radius:8px;font-size:12px;
+    background:linear-gradient(120deg,var(--pulse),var(--ice));color:#04140d;border:none;font-weight:700;cursor:pointer;">
+    Connect
+  </button>
+  <button onclick="showTokenBanner(false)" style="padding:6px 10px;border-radius:8px;font-size:12px;
+    background:none;border:1px solid rgba(255,255,255,.1);color:var(--ink-faint);cursor:pointer;">
+    Skip (local only)
+  </button>
+</div>
+
+<!-- ============================================================
      MAIN CONTENT
      ============================================================ -->
 <main class="container">
@@ -994,36 +1017,61 @@ if (bc) {
 
 
 /* ================================================================
-   SHARED STORAGE — jsonblob.com
-   One blob, shared by everyone who opens this page. Zero setup.
+   SYNC — stored as a file in the GitHub repo (the actual website).
+   Read:  raw.githubusercontent.com — public, no auth, CORS ✓
+   Write: GitHub Contents API — needs a token (one-time setup)
    ================================================================ */
-const BLOB = 'https://jsonblob.com/api/jsonBlob/019ecc54-b598-7ce1-8198-b2f0bf9003d1';
+const GH_OWNER   = 'theprasunbanerjee';
+const GH_REPO    = 'theprasunbanerjee.github.io';
+const GH_PATH    = 'noteflow/sync.json';
+const GH_API     = `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/contents/${GH_PATH}`;
+const GH_RAW     = `https://raw.githubusercontent.com/${GH_OWNER}/${GH_REPO}/main/${GH_PATH}`;
+const GH_PAT_KEY = 'noteflow.ghpat.v1';
 
-let lastPushedTs = '';
+let ghPat        = '';
+let ghSha        = '';
 let pushDebounce = null;
+let syncInterval = null;
 
-async function pushBlob() {
-  flushCurrentSession();
-  const ts = new Date().toISOString();
-  sessions.forEach(s => { if (!s.updatedAt) s.updatedAt = ts; });
-  try {
-    const res = await fetch(BLOB, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-      body: JSON.stringify({ sessions, updatedAt: ts })
-    });
-    if (res.ok) lastPushedTs = ts;
-  } catch(e) {}
+/* ---- token setup UI ---- */
+function showTokenBanner(show) {
+  const b = document.getElementById('syncBanner');
+  if (b) b.hidden = !show;
 }
 
-async function pollBlob() {
-  try {
-    const res = await fetch(BLOB, { headers: { 'Accept': 'application/json' } });
-    if (!res.ok) return;
-    const data = await res.json();
-    if (!data?.sessions || !Array.isArray(data.sessions)) return;
-    if (data.updatedAt && data.updatedAt === lastPushedTs) return;
+function saveToken() {
+  const inp = document.getElementById('tokenInput');
+  const val = (inp?.value || '').trim();
+  if (!val) return;
+  ghPat = val;
+  localStorage.setItem(GH_PAT_KEY, val);
+  showTokenBanner(false);
+  fetchRemote();
+  startPoll();
+}
 
+/* ---- read ---- */
+async function fetchRemote() {
+  try {
+    // Use API (with token) for fresh data; fall back to raw URL (may be cached ~1 min)
+    const url     = ghPat ? GH_API + '?t=' + Date.now() : GH_RAW + '?t=' + Date.now();
+    const headers = ghPat
+      ? { Authorization: 'token ' + ghPat, Accept: 'application/vnd.github.v3+json' }
+      : {};
+
+    const res = await fetch(url, { headers });
+    if (!res.ok) return;
+
+    let data;
+    if (ghPat) {
+      const json = await res.json();
+      ghSha = json.sha;
+      data  = JSON.parse(atob(json.content.replace(/\n/g, '')));
+    } else {
+      data = await res.json();
+    }
+
+    if (!data?.sessions || !Array.isArray(data.sessions)) return;
     if (Date.now() - lastKeyAt < 1200) return;
 
     let changed = false;
@@ -1035,8 +1083,7 @@ async function pollBlob() {
     });
 
     if (changed) {
-      persistSessions();
-      updatePill();
+      persistSessions(); updatePill();
       const nc = sessions[activeId]?.content || '';
       if (nc !== editor.value) { editor.value = nc; updateStats(); }
       const sg = document.getElementById('sessionsGrid');
@@ -1045,14 +1092,40 @@ async function pollBlob() {
   } catch(e) {}
 }
 
+/* ---- write ---- */
+async function pushRemote() {
+  if (!ghPat) return;
+  flushCurrentSession();
+  const body = {
+    message: 'sync',
+    content: btoa(unescape(encodeURIComponent(JSON.stringify({ sessions })))),
+    ...(ghSha ? { sha: ghSha } : {})
+  };
+  try {
+    const res = await fetch(GH_API, {
+      method: 'PUT',
+      headers: { Authorization: 'token ' + ghPat, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    if (res.ok) { const j = await res.json(); ghSha = j.content.sha; }
+  } catch(e) {}
+}
+
 function schedulePush() {
   clearTimeout(pushDebounce);
-  pushDebounce = setTimeout(pushBlob, 2000);
+  pushDebounce = setTimeout(pushRemote, 3000);
+}
+
+function startPoll() {
+  clearInterval(syncInterval);
+  syncInterval = setInterval(fetchRemote, ghPat ? 8000 : 60000);
 }
 
 function initSync() {
-  pollBlob();                       // load remote state immediately on open
-  setInterval(pollBlob, 5000);      // keep polling every 5 s for changes
+  ghPat = localStorage.getItem(GH_PAT_KEY) || '';
+  showTokenBanner(!ghPat);
+  fetchRemote();
+  startPoll();
 }
 
 
